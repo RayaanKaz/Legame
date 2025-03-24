@@ -1151,7 +1151,7 @@ def login_ui():
                 st.error("Incorrect username or password")
 
     st.markdown("<div class='auth-footer'>", unsafe_allow_html=True)
-    st.markdown("Don't have an account? Register an account now!", unsafe_allow_html=True)
+    st.markdown("Don't have an account? Register an account now! Click the arrow in the top right!", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
     # JavaScript to handle the register link click
