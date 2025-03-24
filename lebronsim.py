@@ -875,9 +875,9 @@ def calculate_xp_reward(player_health, lebron_health, difficulty, won):
     # Difficulty multiplier
     diff_multiplier = 1.0
     if difficulty == "Medium":
-        diff_multiplier = 1.5
-    elif difficulty == "Hard":
         diff_multiplier = 2.0
+    elif difficulty == "Hard":
+        diff_multiplier = 2.5
 
     # Victory bonus
     victory_bonus = 50 if won else 0
