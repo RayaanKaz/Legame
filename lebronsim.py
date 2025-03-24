@@ -929,7 +929,7 @@ def get_lebron_image_url(level):
         "https://staticg.sportskeeda.com/editor/2023/04/69f5f-16824247788019-1920.jpg?w=640",
         "https://www.bardown.com/polopoly_fs/1.878128!/fileimage/httpImage/image.JPG_gen/derivatives/landscape_620/lebron-james.JPG",
         "https://i.pinimg.com/474x/c0/bd/7a/c0bd7acdf89a7419ca8f31846392a35d.jpg",
-        "https://i.guim.co.uk/img/media/bf8c63b511e78c2f29480f22e7a2db43168f3993/0_0_1744_2091/master/1744.jpg?width=445&dpr=1&s=none&crop=none",
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/LeBronWizards1.jpg/1599px-LeBronWizards1.jpg",
         "https://static01.nyt.com/images/2020/03/09/sports/09nba-topteams1/merlin_170229057_ce4be847-c57c-41fc-9a4d-70008084dff7-articleLarge.jpg?quality=75&auto=webp&disable=upscale",
         "https://cdn.nba.com/headshots/nba/latest/1040x760/2544.png",
         "https://cdn.nba.com/teams/uploads/sites/1610612747/2023/02/lebron-scoring-record-1000x1000-GettyImages-3061773.jpg",
