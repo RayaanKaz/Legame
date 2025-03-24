@@ -220,7 +220,7 @@ class LeBron(Player):
         self.move_patterns = self.set_move_patterns()
         self.consecutive_attacks = 0
         self.consecutive_defends = 0
-        self.player_last_hp = 140  # Store opponent's last HP to track damage dealt
+        self.player_last_hp = 150  # Store opponent's last HP to track damage dealt
         self.player_last_stamina = 100  # Store opponent's last stamina to track changes
         self.player_pattern_memory = []  # Remember opponent's last 5 moves instead of 3
         self.turn_count = 0
@@ -683,7 +683,7 @@ def initialize_session_state():
     if "difficulty" not in st.session_state:
         st.session_state.difficulty = "Medium"
     if "player" not in st.session_state or st.session_state.get("restart_game", False):
-        st.session_state.player = Player("You", 140, 100)
+        st.session_state.player = Player("You", 150, 100)
     if "lebron" not in st.session_state or st.session_state.get("restart_game", False):
         st.session_state.lebron = LeBron(st.session_state.difficulty)
     if st.session_state.get("restart_game", False):
@@ -885,7 +885,7 @@ def calculate_xp_reward(player_health, lebron_health, difficulty, won):
     # Health margin bonus (only for wins)
     margin_bonus = 0
     if won:
-        margin_bonus = int((player_health / 140) * 30)  # Up to 30 extra XP based on remaining health
+        margin_bonus = int((player_health / 150) * 30)  # Up to 30 extra XP based on remaining health
 
     # Calculate total XP
     total_xp = int((base_xp + victory_bonus + margin_bonus) * diff_multiplier)
@@ -1319,7 +1319,7 @@ def display_difficulty_selection():
         """)
         st.session_state.tutorial_shown = True
     if st.button("Start Game", use_container_width=True):
-        st.session_state.player = Player("You", 140, 100)
+        st.session_state.player = Player("You", 150, 100)
         st.session_state.lebron = LeBron(st.session_state.difficulty)
         st.session_state.turn = 0
         st.session_state.round = 1
