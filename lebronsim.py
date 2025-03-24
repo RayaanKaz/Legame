@@ -221,11 +221,21 @@ class LeBron(Player):
         self.consecutive_attacks = 0
         self.consecutive_defends = 0
         self.player_last_hp = 140  # Store opponent's last HP to track damage dealt
-        self.player_pattern_memory = []  # Remember opponent's last 3 moves
+        self.player_last_stamina = 100  # Store opponent's last stamina to track changes
+        self.player_pattern_memory = []  # Remember opponent's last 5 moves instead of 3
         self.turn_count = 0
+        self.damage_dealt_history = []  # Track damage dealt per turn
+        self.damage_taken_history = []  # Track damage taken per turn
+        self.player_special_meter_history = []  # Track player's special meter progression
+        self.successful_defends = 0  # Count successful defend actions
+        self.successful_attacks = 0  # Count successful attack actions
+        self.player_rest_count = 0  # Count how many times player has rested
+        self.player_defend_count = 0  # Count how many times player has defended
+        self.phase = "early"  # Track battle phase (early, mid, late)
+        self.adaptive_strategy = self.initialize_adaptive_strategy()
 
     def set_move_patterns(self):
-        """Define LeBron's move patterns based on difficulty."""
+        """Define LeBron's move patterns based on difficulty with more nuanced strategy."""
         if self.difficulty == "Easy":
             return {"attack": 0.4, "defend": 0.3, "rest": 0.25, "special": 0.05}
         elif self.difficulty == "Medium":
@@ -233,60 +243,185 @@ class LeBron(Player):
         else:  # Hard difficulty
             return {"attack": 0.5, "defend": 0.2, "rest": 0.15, "special": 0.15}
 
+    def initialize_adaptive_strategy(self):
+        """Initialize adaptive strategy based on opponent behavior."""
+        return {
+            "aggressive": 0,    # Player attacks frequently
+            "defensive": 0,     # Player defends frequently 
+            "resourceful": 0,   # Player manages resources well
+            "pattern_based": 0, # Player follows patterns
+            "special_focused": 0 # Player focuses on special attacks
+        }
+
+    def update_battle_phase(self):
+        """Update the battle phase based on turn count and health."""
+        if self.health > self.max_health * 0.7 and self.turn_count < 5:
+            self.phase = "early"
+        elif self.health > self.max_health * 0.3 or self.turn_count < 10:
+            self.phase = "mid"
+        else:
+            self.phase = "late"
+
     def analyze_player_pattern(self, player):
-        """Analyze player's pattern and adjust strategy accordingly (for Medium and Hard only)"""
+        """Enhanced analysis of player's pattern with more metrics tracked."""
         if self.difficulty == "Easy":
             return  # Skip analysis for Easy mode
 
         # Track player health changes to detect attacks
-        damage_taken = self.player_last_hp - player.health
+        damage_taken = max(0, self.player_last_hp - player.health)
+        if damage_taken > 0:
+            self.damage_taken_history.append(damage_taken)
+        
+        # Calculate damage dealt to player
+        if hasattr(player, 'last_health') and player.last_health > player.health:
+            damage_dealt = player.last_health - player.health
+            self.damage_dealt_history.append(damage_dealt)
+            
+            if damage_dealt > 0:
+                self.successful_attacks += 1
+
         self.player_last_hp = player.health
+        
+        # Track special meter progression
+        if hasattr(player, 'special_meter'):
+            self.player_special_meter_history.append(player.special_meter)
 
         # Record player's apparent move
         player_move = None
         if damage_taken > 0:
             if damage_taken > 35:  # Likely a special attack
                 player_move = "special"
+                self.adaptive_strategy["special_focused"] += 2
             else:
                 player_move = "attack"
+                self.adaptive_strategy["aggressive"] += 1
         elif player.stamina > self.player_last_stamina:
             player_move = "rest"
+            self.player_rest_count += 1
+            self.adaptive_strategy["resourceful"] += 1
         elif player.is_defending:
             player_move = "defend"
+            self.player_defend_count += 1
+            self.adaptive_strategy["defensive"] += 1
 
         self.player_last_stamina = player.stamina
 
-        # Add to pattern memory (keep last 3 moves)
+        # Add to pattern memory (keep last 5 moves instead of 3)
         if player_move:
             self.player_pattern_memory.append(player_move)
-            if len(self.player_pattern_memory) > 3:
+            if len(self.player_pattern_memory) > 5:
                 self.player_pattern_memory.pop(0)
+                
+            # Check for patterns in last 5 moves
+            if len(self.player_pattern_memory) >= 5:
+                # Check for repetitive patterns (e.g., attack-defend-attack-defend)
+                pattern_detected = self.check_for_repeating_patterns()
+                if pattern_detected:
+                    self.adaptive_strategy["pattern_based"] += 2
+
+    def check_for_repeating_patterns(self):
+        """Check for repeating patterns in player's moves."""
+        if len(self.player_pattern_memory) < 4:
+            return False
+            
+        # Check for alternating patterns (e.g., attack-defend-attack-defend)
+        if (self.player_pattern_memory[-4] == self.player_pattern_memory[-2] and 
+            self.player_pattern_memory[-3] == self.player_pattern_memory[-1]):
+            return True
+            
+        # Check for three identical moves in last 4 moves
+        move_counts = {}
+        for move in self.player_pattern_memory[-4:]:
+            move_counts[move] = move_counts.get(move, 0) + 1
+            
+        for count in move_counts.values():
+            if count >= 3:
+                return True
+                
+        return False
 
     def predict_player_action(self):
-        """Try to predict player's next action based on pattern"""
-        if len(self.player_pattern_memory) < 2 or self.difficulty == "Easy":
+        """Enhanced prediction of player's next action based on comprehensive pattern analysis."""
+        if len(self.player_pattern_memory) < 3 or self.difficulty == "Easy":
             return None
 
-        # Look for patterns like "attack, attack, special" or "rest, attack"
-        if self.difficulty == "Hard":
-            # Check for "rest then attack" pattern
-            if self.player_pattern_memory[-1] == "rest":
-                return "attack"  # Player might attack after resting
+        # For medium and hard difficulty, perform more sophisticated prediction
+        if self.difficulty in ["Medium", "Hard"]:
+            # Check most recent pattern
+            last_three = self.player_pattern_memory[-3:]
+            
+            # Check for common sequences
+            if last_three == ["attack", "attack", "attack"]:
+                return "special" if random.random() < 0.7 else "rest"
+                
+            if last_three == ["rest", "attack", "attack"]:
+                return "special" if random.random() < 0.6 else "attack"
+                
+            if last_three == ["defend", "defend", "rest"]:
+                return "attack"
+                
+            if last_three == ["special", "rest", "rest"]:
+                return "attack"
+                
+            # Check for stamina-based patterns
+            if "rest" in last_three and last_three[-1] != "rest":
+                # Player recently rested but not on last turn, likely has stamina for attack
+                return "attack" if random.random() < 0.7 else "special"
+                
+            # Check for defensive patterns
+            if last_three.count("defend") >= 2:
+                # Player is defensive, might be setting up for a special
+                return "defend" if random.random() < 0.6 else "rest"
+                
+            # If player just did a special, they might rest
+            if last_three[-1] == "special":
+                return "rest" if random.random() < 0.8 else "defend"
+                
+            # If two attacks in a row, they might be building special
+            if last_three[-2:] == ["attack", "attack"]:
+                return "attack" if random.random() < 0.4 else "special"
 
-            # Check for "multiple attacks" pattern
-            attack_count = self.player_pattern_memory.count("attack")
-            if attack_count >= 2:
-                return "special"  # Player might be building special meter
-
-            # Check for special meter buildup
-            if "special" in self.player_pattern_memory:
-                return "rest"  # Player used special, likely needs to rest
+        # Advanced pattern prediction for Hard difficulty
+        if self.difficulty == "Hard" and len(self.player_pattern_memory) >= 5:
+            # Look for longer patterns
+            if self.player_pattern_memory[-2:] == ["rest", "rest"]:
+                return "attack"  # Player likely recovering a lot of stamina
+                
+            if self.player_pattern_memory[-3:] == ["defend", "attack", "attack"]:
+                return "special"  # Classic buildup pattern
+                
+            # Analyze dominant play style
+            style_scores = self.adaptive_strategy.copy()
+            dominant_style = max(style_scores, key=style_scores.get)
+            
+            if dominant_style == "aggressive" and style_scores["aggressive"] > 5:
+                return "defend"  # Counter aggressive players with defense
+                
+            if dominant_style == "defensive" and style_scores["defensive"] > 5:
+                return "rest"  # Against defensive players, build resources
+                
+            if dominant_style == "special_focused" and style_scores["special_focused"] > 5:
+                return "defend"  # Prepare for their special attacks
+                
+            if dominant_style == "pattern_based" and style_scores["pattern_based"] > 5:
+                # Break their pattern with unpredictability
+                return random.choice(["attack", "defend", "rest"])
 
         return None
 
+    def calculate_stamina_efficiency(self):
+        """Calculate how efficiently the player is using stamina."""
+        if not self.damage_dealt_history or self.player_rest_count == 0:
+            return 0
+            
+        avg_damage = sum(self.damage_dealt_history) / len(self.damage_dealt_history)
+        stamina_efficiency = avg_damage / (self.player_rest_count + 1)  # Avoid division by zero
+        return stamina_efficiency
+
     def choose_action(self, player=None):
-        """Choose LeBron's action based on strategy, difficulty and game state."""
+        """Enhanced decision-making for LeBron's actions based on advanced strategy and game state analysis."""
         self.turn_count += 1
+        self.update_battle_phase()
 
         # Update pattern analysis if we have player information
         if player:
@@ -314,56 +449,116 @@ class LeBron(Player):
             # Significantly reduce chance of resting when stamina is high
             weights["rest"] *= 0.2  # 80% reduction in rest probability when above threshold
 
-        # TACTICAL DECISIONS (based on difficulty)
-        if self.difficulty == "Hard" or self.difficulty == "Medium":
-            # If health is very low, increase chance of defensive move
-            if self.health < self.max_health * 0.3:
-                weights["defend"] *= 2.0
-
-            # If player has high special meter and we predict special attack
-            predicted_move = self.predict_player_action()
-            if predicted_move == "special" and player and player.special_meter >= 75:
-                weights["defend"] *= 3.0  # Very likely to defend
-
-            # If we have special meter full and player is low on health, use special
+        # PHASE-BASED STRATEGY
+        if self.phase == "early":
+            # Early game: focus on building special meter and resource management
+            weights["defend"] *= 1.3  # More defensive early on
+            if self.turn_count < 3:
+                weights["attack"] *= 0.9  # Slightly less aggressive at start
+                
+        elif self.phase == "mid":
+            # Mid game: balanced approach with tactical decisions
+            weights["attack"] *= 1.1
+            # If we have good special meter, consider using it
+            if self.special_meter >= 90:
+                weights["special"] *= 1.5
+                
+        else:  # late phase
+            # Late game: more aggressive, focus on finishing
+            weights["attack"] *= 1.3
+            weights["defend"] *= 0.8
+            # If we have special and player is low, prioritize it
             if self.special_meter >= 100 and player and player.health < player.max_health * 0.4:
                 return "special"  # Go for the kill
 
-            # Avoid predictable patterns
-            if self.consecutive_attacks >= 2:
-                weights["attack"] *= 0.5  # Reduce chance of third consecutive attack
+        # ADAPTIVE STRATEGY based on player behavior
+        if self.difficulty in ["Medium", "Hard"]:
+            # Counter aggressive players with more defense
+            if self.adaptive_strategy["aggressive"] > 5:
+                weights["defend"] *= 1.4
+                
+            # Against defensive players, build special meter
+            if self.adaptive_strategy["defensive"] > 5:
+                weights["attack"] *= 1.3
+                
+            # If player manages resources well, be more aggressive
+            if self.adaptive_strategy["resourceful"] > 5:
+                weights["attack"] *= 1.2
+                weights["rest"] *= 0.8
+                
+            # If player is pattern-based, use more unpredictable moves
+            if self.adaptive_strategy["pattern_based"] > 5:
+                # Add randomness to counter predictable players
+                rand_factor = 0.3 + random.random() * 0.4  # 0.3 to 0.7
+                for action in weights:
+                    weights[action] *= (1 + (random.random() - 0.5) * rand_factor)
 
-            if self.consecutive_defends >= 2:
-                weights["defend"] *= 0.3  # Reduce chance of third consecutive defense
+        # TACTICAL DECISIONS based on prediction
+        predicted_move = self.predict_player_action()
+        if predicted_move and self.difficulty in ["Medium", "Hard"]:
+            # Strategic counter-moves based on prediction
+            if predicted_move == "attack":
+                weights["defend"] *= 2.0
+                
+            elif predicted_move == "defend":
+                weights["rest"] *= 1.5  # Build resources against defensive player
+                weights["attack"] *= 0.7  # Less likely to attack into defense
+                
+            elif predicted_move == "special":
+                weights["defend"] *= 3.0  # Very likely to defend against special
+                
+            elif predicted_move == "rest":
+                weights["attack"] *= 1.8  # Punish resting with attacks
 
-            # Enhanced special attack strategy
-            if self.special_meter >= 100:
-                special_threshold = 0.8 if self.difficulty == "Hard" else 0.6
-                if random.random() < special_threshold:
+        # HARD MODE ENHANCEMENTS
+        if self.difficulty == "Hard":
+            # Check if player is close to having special ready
+            if player and hasattr(player, 'special_meter') and player.special_meter >= 90:
+                weights["defend"] *= 2.0  # Prepare for potential special attack
+                
+            # If player is consistently doing high damage, prioritize defense
+            if len(self.damage_taken_history) >= 3:
+                recent_damage = sum(self.damage_taken_history[-3:]) / 3
+                if recent_damage > 25:  # Player is doing significant damage
+                    weights["defend"] *= 1.7
+                    
+            # If player has low health, go for the kill
+            if player and player.health < player.max_health * 0.25:
+                weights["attack"] *= 2.0
+                weights["special"] *= 3.0 if self.special_meter >= 100 else 1.0
+                
+            # If player has low stamina, apply pressure
+            if player and player.stamina < 30:
+                weights["attack"] *= 1.8  # Attack when they're low on stamina
+                
+            # If player is defending a lot, wait them out
+            if self.player_defend_count > self.turn_count * 0.4:  # >40% of turns defending
+                weights["rest"] *= 1.5
+                weights["attack"] *= 0.6
+                
+            # Advanced special meter management
+            if 80 <= self.special_meter < 100:
+                # If close to special, prioritize getting it ready
+                weights["defend"] *= 1.4  # Defense builds special meter
+                
+            # Combo detection - if we've landed several successful attacks
+            if self.successful_attacks >= 3 and player and player.health < player.max_health * 0.6:
+                # Go for special to capitalize on successful combo
+                if self.special_meter >= 100:
                     return "special"
 
-            # If player is defending, consider resting instead of attacking
-            if player and player.is_defending:
-                weights["attack"] *= 0.4
-                weights["rest"] *= 1.5
+        # UNIVERSAL IMPROVEMENTS
+        # Avoid predictable patterns
+        if self.consecutive_attacks >= 2:
+            weights["attack"] *= 0.5  # Reduce chance of third consecutive attack
 
-        # Hard mode specific enhancements
-        if self.difficulty == "Hard":
-            # Hard mode should be more conservative with stamina, but not rest unnecessarily
-            if 15 < self.stamina < 40:
-                weights["rest"] *= 1.5
+        if self.consecutive_defends >= 2:
+            weights["defend"] *= 0.3  # Reduce chance of third consecutive defense
 
-            # More aggressive when player is low on health
-            if player and player.health < player.max_health * 0.3:
-                weights["attack"] *= 1.5
-
-            # Use stamina efficiently at the beginning of the battle
-            if self.turn_count < 5 and self.health > self.max_health * 0.8:
-                weights["defend"] *= 1.3  # Defend early to build special meter
-
-        # Prefer attacking over resting when stamina is decent
-        if self.stamina > 50:
-            weights["attack"] *= 1.3
+        # If opponent is defending, consider resting instead of attacking
+        if player and player.is_defending:
+            weights["attack"] *= 0.4
+            weights["rest"] *= 1.5
 
         # Calculate the final decision
         actions = list(weights.keys())
@@ -373,11 +568,19 @@ class LeBron(Player):
 
         # Double-check resting logic - only rest if truly needed (below 30 stamina)
         if chosen_action == "rest" and self.stamina > 30:
-            # Reconsider with reduced rest weight
-            weights["rest"] = 0.1  # Very low chance
-            actions = list(weights.keys())
-            weights_list = list(weights.values())
-            chosen_action = random.choices(actions, weights=weights_list)[0]
+            # Exception: if player is defending and we've attacked consecutively, resting is smart
+            if not (player and player.is_defending and self.consecutive_attacks >= 2):
+                # Reconsider with reduced rest weight
+                weights["rest"] = 0.1  # Very low chance
+                actions = list(weights.keys())
+                weights_list = list(weights.values())
+                chosen_action = random.choices(actions, weights=weights_list)[0]
+
+        # If special meter is full and health is critical, use special as last resort
+        if self.special_meter >= 100 and self.health < self.max_health * 0.2 and chosen_action != "special":
+            # 70% chance to override with special as a desperate move
+            if random.random() < 0.7:
+                chosen_action = "special"
 
         # Update consecutive action counters
         if chosen_action == "attack":
@@ -390,8 +593,12 @@ class LeBron(Player):
             self.consecutive_attacks = 0
             self.consecutive_defends = 0
 
-        return chosen_action
+        # Store player's health for next turn comparison
+        if player:
+            player.last_health = player.health
 
+        return chosen_action
+    
     def attack(self):
         """Perform an attack with a chance to lower opponent's stamina."""
         damage, msg = super().attack()
